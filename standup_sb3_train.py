@@ -6,7 +6,6 @@ from stable_baselines3.common.monitor import Monitor
 import os
 
 ## 1. Define the environment using gymnasium
-# 2. 使用 Monitor 包装环境
 env = Monitor(gym.make('HumanoidStandup-v4', render_mode="human", width=1280, height=1024))
 
 ## 2. Vectorize the environment
@@ -47,28 +46,6 @@ model = PPO(
     # seed = None,
     # device = "auto",
     # _init_setup_model = True
-    
-    # 👇PPO推荐参数
-#     "MlpPolicy", 
-#     normalize=True,
-#     n_envs= 1,
-#   n_timesteps=1e7,
-#   batch_size=32,
-#   n_steps=512,
-#   gamma=0.99,
-#   learning_rate=2.55673e-05,
-#   ent_coef=3.62109e-06,
-#   clip_range=0.3,
-#   n_epochs=20,
-#   gae_lambda=0.9,
-#   max_grad_norm=0.7,
-#   vf_coef=0.430793,
-#   policy_kwargs="dict(
-#                     log_std_init=-2,
-#                     ortho_init=False,
-#                     activation_fn=nn.ReLU,
-#                     net_arch=dict(pi=[256, 256], vf=[256, 256])
-#                   )"
 )
 
 ## 4. Train the model
