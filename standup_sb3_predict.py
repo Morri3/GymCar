@@ -12,7 +12,7 @@ env = DummyVecEnv([lambda : env])
 
 ## 3. Load the trained model
 RL_NAME = 'SAC'
-CHECKPOINT = '125000'
+CHECKPOINT = '250000'
 model = SAC.load("./model/"+RL_NAME+"_Humanoid_"+CHECKPOINT+".pkl")
 
 # ## 4. Initialize some variables
