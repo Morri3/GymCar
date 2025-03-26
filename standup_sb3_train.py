@@ -73,8 +73,8 @@ for i in range(10):
     eval_callback = EvalCallback(env, best_model_save_path='./best_models/'+RL_NAME+'/', log_path='./logs/', verbose=1, eval_freq=1000)
     # checkpoint_callback = CheckpointCallback(save_freq=1000, save_path='./logs/', name_prefix='PPO')
     # 2) train the model
-    # model.learn(total_timesteps=TOTAL_TIMESTEPS, callback=eval_callback, reset_num_timesteps=False)
     model.learn(total_timesteps=TOTAL_TIMESTEPS, callback=eval_callback)
+    # model.learn(total_timesteps=TOTAL_TIMESTEPS, callback=eval_callback, reset_num_timesteps=False)
     # 3) save the model
     model.save(f"./model/{RL_NAME}_Humanoid_{TOTAL_TIMESTEPS*(i+1)}.pkl")
 

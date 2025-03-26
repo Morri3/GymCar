@@ -20,30 +20,30 @@ model = SAC.load("./model/"+RL_NAME+"_Humanoid_"+CHECKPOINT+".pkl")
 # score = 0
 # done = False
 
-## 5. Simulate the interaction process between the agent and the environment
+## 4. Simulate the interaction process between the agent and the environment
 for i in range(10):
-    ## 4. Initialize some variables
+    # 1) Initialize some variables
     observation = env.reset() # reset the environment to get the initial state
     score = 0
     done = False
-    while not done:   # 等会儿换成True
-        # 1) Agent policy that uses the observation and info
+    while not done:
+        # 2) Agent policy that uses the observation and info
         action, _ = model.predict(observation=observation)
-        # 2) Step (transition) through the environment with the action
+        # 3) Step (transition) through the environment with the action
         #   receiving the next observation, reward and if the episode has terminated
         #   done: whether we should stop the environment
         observation, reward, done, info = env.step(actions=action)
-        # 3) compute the score
+        # 4) compute the score
         score += reward
-        # 4) Show rendering results using rgb_array mode and OpenCV
+        # 5) Show rendering results using rgb_array mode and OpenCV
         frame = env.render()
         cv2.imshow('env', frame)
         cv2.waitKey(1)
-        # 5) output the score
+        # 6) output the score
         if done:
             print(f"Episode finished with score: {score}")
             score = 0
             observation = env.reset()
 
-## 6. close the environment
+## 5. close the environment
 env.close()
