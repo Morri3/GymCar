@@ -3,65 +3,84 @@ from stable_baselines3 import SAC, PPO
 from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.callbacks import EvalCallback
 import os
+import torch.nn as nn
+import torch
+print(torch.cuda.is_available())
 
 ## 1. Define the environment using gymnasium
-env = Monitor(gym.make('HumanoidStandup-v4', render_mode="human", width=1280, height=1024))
+env = Monitor(gym.make('Humanoid-v4', render_mode="human", width=1280, height=1024))
 
 ## 2. Vectorize the environment
 ## (若有包含多个env的列表传入DummyVecEnv，可用一个线程执行多个env，提高训练效率)
 env = DummyVecEnv([lambda : env])
 
 ## 3. Define the model
-model = PPO(
+RL_NAME = 'SAC'
+model = SAC(
     "MlpPolicy", # the policy model to use
     env, # the environment to learn from
-    verbose=1, # print info messages (such as device or wrappers used)
-    tensorboard_log="./HumanoidStandup-v4/" # the log location for tensorboard
-    
-    # 👇PPO默认参数
-    # "MlpPolicy", 
-    # env,
-    # learning_rate = 3e-4,
-    # n_steps = 2048,
-    # batch_size = 64,
-    # n_epochs = 10,
-    # gamma = 0.99,
-    # gae_lambda = 0.95,
-    # clip_range = 0.2,
-    # clip_range_vf = None,
-    # normalize_advantage = True,
-    # ent_coef = 0.0,
-    # vf_coef = 0.5,
-    # max_grad_norm = 0.5,
-    # use_sde = False,
-    # sde_sample_freq = -1,
-    # rollout_buffer_class = None,
-    # rollout_buffer_kwargs = None,
-    # target_kl = None,
-    # stats_window_size = 100,
-    # tensorboard_log = None,
-    # policy_kwargs = None,
-    # verbose = 0,
-    # seed = None,
-    # device = "auto",
-    # _init_setup_model = True
+    verbose = 1, # print info messages (such as device or wrappers used)
+    tensorboard_log = "./Humanoid-v4/", # the log location for tensorboard
+    # learning_rate = 3e-5,
+    device="cuda" # using gpu
 )
+# model = PPO(
+#     "MlpPolicy", # the policy model to use
+#     env, # the environment to learn from
+#     verbose = 1, # print info messages (such as device or wrappers used)
+#     tensorboard_log = "./Humanoid-v4/", # the log location for tensorboard
+#     # learning_rate = 3e-5,
+#     learning_rate = 3.56987e-05,
+#     n_steps = 512,
+#     batch_size = 256,
+#     n_epochs = 5,
+#     gamma = 0.95,
+#     gae_lambda = 0.9,
+#     clip_range = 0.3,
+#     normalize_advantage = True,
+#     ent_coef = 0.00238306,
+#     vf_coef = 0.431892,
+#     max_grad_norm = 2,
+#     policy_kwargs = dict(
+#                         log_std_init=-2,
+#                         ortho_init=False,
+#                         activation_fn=nn.ReLU,
+#                         net_arch=dict(pi=[256, 256], vf=[256, 256])
+#                     )
+#     # device="cuda" # using gpu
+# )
 
-## 4. Train the model
-# model.learn(total_timesteps=1e4, log_interval=4)
-# model.learn(total_timesteps=2e6)
-model.learn(total_timesteps=25000)
+# ## 4. Train the model
+# # 1) define the callback
+# eval_callback = EvalCallback(env, best_model_save_path='./best_models/', log_path='./logs/', verbose=1, eval_freq=1000)
+# # checkpoint_callback = CheckpointCallback(save_freq=1000, save_path='./logs/', name_prefix='PPO')
+# # 2) train the model
+# # model.learn(total_timesteps=25000, callback=eval_callback)
+# model.learn(total_timesteps=2e6, callback=eval_callback)
+# # model.learn(total_timesteps=1e4, log_interval=4)
 
-## 5. Evaluate the policy
-mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10, render=True) # return the mean and variance of the model's scores after n tests
-print("mean_reward: ", mean_reward, "; std_reward: ", std_reward)
-
-## 6. Save the model
+## 4. Save the model
 path = './model'
 if not os.path.exists(path):
     os.makedirs("./model", exist_ok=True)
-model.save("./model/HumanoidStandup.pkl")
+    
+## 5. Train the model
+TOTAL_TIMESTEPS = 25000
+for i in range(10):
+    # 1) define the callback
+    eval_callback = EvalCallback(env, best_model_save_path='./best_models/'+RL_NAME+'/', log_path='./logs/', verbose=1, eval_freq=1000)
+    # checkpoint_callback = CheckpointCallback(save_freq=1000, save_path='./logs/', name_prefix='PPO')
+    # 2) train the model
+    # model.learn(total_timesteps=TOTAL_TIMESTEPS, callback=eval_callback, reset_num_timesteps=False)
+    model.learn(total_timesteps=TOTAL_TIMESTEPS, callback=eval_callback)
+    # 3) save the model
+    model.save(f"./model/{RL_NAME}_Humanoid_{TOTAL_TIMESTEPS*(i+1)}.pkl")
+
+## 6. Evaluate the policy
+mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=10, render=True) # return the mean and variance of the model's scores after n tests
+print("mean_reward: ", mean_reward, "; std_reward: ", std_reward)
 
 ## 7. Close the environment
 env.close()
