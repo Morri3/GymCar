@@ -68,7 +68,7 @@ if not os.path.exists(path):
     
 ## 5. Train the model
 TOTAL_TIMESTEPS = 25000
-for i in range(10):
+for i in range(30):
     # 1) define the callback
     eval_callback = EvalCallback(env, best_model_save_path='./best_models/'+RL_NAME+'/', log_path='./logs/', verbose=1, eval_freq=1000)
     # checkpoint_callback = CheckpointCallback(save_freq=1000, save_path='./logs/', name_prefix='PPO')

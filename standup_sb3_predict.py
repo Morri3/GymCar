@@ -1,49 +1,48 @@
 import gymnasium as gym
-from stable_baselines3 import SAC, PPO
+from stable_baselines3 import SAC, PPO, A2C
 from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
 import cv2
 
-## 1. Define the environment using gymnasium
-env = gym.make('Humanoid-v4', render_mode="rgb_array", width=1280, height=1024)
+def main():
+    # 1. Define the environment using gymnasium
+    env = gym.make('Humanoid-v4', render_mode="rgb_array", width=1280, height=1024)
 
-## 2. Vectorize the environment
-## (若有包含多个env的列表传入DummyVecEnv，可用一个线程执行多个env，提高训练效率)
-env = DummyVecEnv([lambda : env])
+    # 2. Vectorize the environment
+    # (若有包含多个env的列表传入DummyVecEnv，可用一个线程执行多个env，提高训练效率)
+    env = DummyVecEnv([lambda : env])
 
-## 3. Load the trained model
-RL_NAME = 'SAC'
-CHECKPOINT = '250000'
-model = SAC.load("./model/"+RL_NAME+"_Humanoid_"+CHECKPOINT+".pkl")
+    ## 3. Load the trained model
+    RL_NAME = 'A2C'
+    CHECKPOINT = '250000'
+    model = A2C.load("./model/"+RL_NAME+"_Humanoid_"+CHECKPOINT+".pkl")
 
-# ## 4. Initialize some variables
-# observation = env.reset() # reset the environment to get the initial state
-# score = 0
-# done = False
+    # 4. Simulate the interaction process between the agent and the environment
+    for i in range(10):
+        # 1) Initialize some variables
+        observation = env.reset() # reset the environment to get the initial state
+        score = 0
+        done = False
+        while not done:
+            # 2) Agent policy that uses the observation and info
+            action, _ = model.predict(observation=observation)
+            # 3) Step (transition) through the environment with the action
+            #   receiving the next observation, reward and if the episode has terminated
+            #   done: whether we should stop the environment
+            observation, reward, done, info = env.step(actions=action)
+            # 4) compute the score
+            score += reward
+            # 5) Show rendering results using rgb_array mode and OpenCV
+            frame = env.render()
+            cv2.imshow('env', frame)
+            cv2.waitKey(1)
+            # 6) output the score
+            if done:
+                print(f"Episode finished with score: {score}")
+                score = 0
+                observation = env.reset()
+                        
+    ## 5. close the environment
+    env.close()
 
-## 4. Simulate the interaction process between the agent and the environment
-for i in range(10):
-    # 1) Initialize some variables
-    observation = env.reset() # reset the environment to get the initial state
-    score = 0
-    done = False
-    while not done:
-        # 2) Agent policy that uses the observation and info
-        action, _ = model.predict(observation=observation)
-        # 3) Step (transition) through the environment with the action
-        #   receiving the next observation, reward and if the episode has terminated
-        #   done: whether we should stop the environment
-        observation, reward, done, info = env.step(actions=action)
-        # 4) compute the score
-        score += reward
-        # 5) Show rendering results using rgb_array mode and OpenCV
-        frame = env.render()
-        cv2.imshow('env', frame)
-        cv2.waitKey(1)
-        # 6) output the score
-        if done:
-            print(f"Episode finished with score: {score}")
-            score = 0
-            observation = env.reset()
-
-## 5. close the environment
-env.close()
+if __name__ == '__main__':
+    main()
