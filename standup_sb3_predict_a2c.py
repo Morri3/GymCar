@@ -11,7 +11,7 @@ def main():
 
     ## 2. Load the trained model
     RL_NAME = 'A2C'
-    CHECKPOINT = '1000000'
+    CHECKPOINT = '1500000'
     model = A2C.load("./model/"+RL_NAME+"_Humanoid_"+CHECKPOINT+".pkl")
 
     ## 3. Initialize some variables

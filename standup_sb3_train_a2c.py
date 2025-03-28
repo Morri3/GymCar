@@ -1,13 +1,10 @@
 import gymnasium as gym
-from stable_baselines3 import SAC, PPO, A2C
-from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
+from stable_baselines3 import A2C
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import EvalCallback
 import os
-import torch.nn as nn
 import torch
 
 def main():
@@ -15,7 +12,7 @@ def main():
 
     ## 1. Define the environment using gymnasium
     # env = Monitor(gym.make('Humanoid-v4', render_mode="human", width=1280, height=1024))
-    env = make_vec_env('Humanoid-v4', n_envs=2, vec_env_cls=SubprocVecEnv)
+    env = make_vec_env('Humanoid-v4', n_envs=1, vec_env_cls=SubprocVecEnv)
 
     ## 2. Define the model
     RL_NAME = 'A2C'
@@ -34,7 +31,7 @@ def main():
         
     ## 4. Train the model
     TOTAL_TIMESTEPS = 25000
-    for i in range(40):
+    for i in range(80):
         # 1) define the callback
         eval_callback = EvalCallback(env, best_model_save_path='./best_models/'+RL_NAME+'/', log_path='./logs/', verbose=1, eval_freq=1000)
         # checkpoint_callback = CheckpointCallback(save_freq=1000, save_path='./logs/', name_prefix='PPO')

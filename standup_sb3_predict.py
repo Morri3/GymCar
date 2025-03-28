@@ -1,5 +1,5 @@
 import gymnasium as gym
-from stable_baselines3 import SAC, PPO, A2C
+from stable_baselines3 import SAC, PPO, A2C, TD3
 from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
 import cv2
 
@@ -12,9 +12,9 @@ def main():
     env = DummyVecEnv([lambda : env])
 
     ## 3. Load the trained model
-    RL_NAME = 'A2C'
-    CHECKPOINT = '250000'
-    model = A2C.load("./model/"+RL_NAME+"_Humanoid_"+CHECKPOINT+".pkl")
+    RL_NAME = 'TD3'
+    CHECKPOINT = '125000'
+    model = TD3.load("./model/"+RL_NAME+"_Humanoid_"+CHECKPOINT+".pkl")
 
     # 4. Simulate the interaction process between the agent and the environment
     for i in range(10):
