@@ -12,9 +12,9 @@ def main():
     env = DummyVecEnv([lambda : env])
 
     ## 3. Load the trained model
-    RL_NAME = 'TD3'
-    CHECKPOINT = '125000'
-    model = TD3.load("./model/"+RL_NAME+"_Humanoid_"+CHECKPOINT+".pkl")
+    RL_NAME = 'SAC'
+    CHECKPOINT = '375000'
+    model = SAC.load("./model/"+RL_NAME+"_Humanoid_"+CHECKPOINT+".pkl")
 
     # 4. Simulate the interaction process between the agent and the environment
     for i in range(10):
