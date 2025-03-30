@@ -5,7 +5,7 @@ import cv2
 
 def main():
     # 1. Define the environment using gymnasium
-    env = gym.make('Humanoid-v4', render_mode="rgb_array", width=1280, height=1024)
+    env = gym.make("MountainCarContinuous-v0", render_mode="rgb_array", goal_velocity=0.1)
 
     # 2. Vectorize the environment
     # (若有包含多个env的列表传入DummyVecEnv，可用一个线程执行多个env，提高训练效率)
@@ -13,8 +13,8 @@ def main():
 
     ## 3. Load the trained model
     RL_NAME = 'SAC'
-    CHECKPOINT = '375000'
-    model = SAC.load("./model/"+RL_NAME+"_Humanoid_"+CHECKPOINT+".pkl")
+    CHECKPOINT = '125000'
+    model = SAC.load("./model/MountainCarContinuous/"+RL_NAME+"_MountainCarContinuous_"+CHECKPOINT+".pkl")
 
     # 4. Simulate the interaction process between the agent and the environment
     for i in range(10):
