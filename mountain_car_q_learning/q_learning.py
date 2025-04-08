@@ -74,7 +74,12 @@ def run(episodes, is_training=True, render=False): # default mode: training
         epsilon = max(epsilon - epsilon_decay_rate, 0)
         # store rewards per episode
         rewards_per_episode[i] = rewards
-        
+        # output the reward each 100 epoches
+        if i % 100 == 0 and is_training:
+            print(f"Current training epoch: {i}, having reward of {rewards_per_episode[i]}.")
+        if not is_training:
+            print(f"Current testing epoch: {i + 1}, having reward of {rewards_per_episode[i]}.")
+    
     # 6. Close the environment
     env.close()
     
@@ -84,11 +89,17 @@ def run(episodes, is_training=True, render=False): # default mode: training
         pickle.dump(q, f) # write the pickled representation of Q-table 'q' to the open file object 'f'
         f.close()
         
-    # 8. Compute and plot the average reward for the past t rounds (max 100 rounds)
+    # 8. Compute and plot the average reward for the past t rounds during training and testing (max 100 rounds)
     mean_rewards = np.zeros(episodes)
     for t in range(episodes):
         mean_rewards[t] = np.mean(rewards_per_episode[max(0, t - 100): (t + 1)])
-    plt.plot(mean_rewards)
+    if is_training:
+        label = 'Training mean rewards'
+    else:
+        label = 'Testing mean rewards'
+    plt.plot(mean_rewards, label=label)
+    plt.title("Average reward for the past t rounds (max 100 rounds)")
+    plt.legend(loc='lower right')
     path = './result'
     if not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
