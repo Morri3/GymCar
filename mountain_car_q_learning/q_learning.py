@@ -3,10 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import pickle # serializing and deserializing python objects
+import time
 
 def run(episodes, is_training=True, render=False): # default mode: training
     # 1. Define the environment using gymnasium
-    env = gym.make('MountainCar-v0', render_mode='human' if render else None) # show the render when predicting
+    env = gym.make('MountainCar-v0', render_mode='human' if render else None) # show the render only when predicting
 
     # 2. State space (Divide position and velocity into 20 segments)
     pos_space = np.linspace(env.observation_space.low[0], env.observation_space.high[0], 20) # between -1.2 and 0.6
@@ -107,11 +108,16 @@ def run(episodes, is_training=True, render=False): # default mode: training
     print("Successfully plot and save the average reward!")
 
 if __name__ == '__main__':
-    # 1. Train
+    # 1. Counting
+    start = time.perf_counter()
+    # 2. Train
     print("Start training...")
     run(episodes=5000, is_training=True, render=False)
     print("End training!!!")
-    # 2. Test
+    # 3. Test
     print("Start testing...")
     run(episodes=10, is_training=False, render=True)
     print("End testing!!!")
+    # 4. Output the consuming time
+    end = time.perf_counter()
+    print(f"The process consumes {end - start} seconds.")
