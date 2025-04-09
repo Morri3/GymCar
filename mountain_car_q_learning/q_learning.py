@@ -4,31 +4,43 @@ import matplotlib.pyplot as plt
 import os
 import pickle # serializing and deserializing python objects
 import time
+import pandas as pd
+from scipy.stats import ttest_ind # t-test
+import seaborn as sns
 
-def run(episodes, is_training=True, render=False): # default mode: training
-    # 1. Define the environment using gymnasium
+def run(episodes, hp, is_training=True, render=False): 
+    # default mode: training
+    # hp: hyperparameter configuration
+    
+    # 1. Initialise for counting
+    durations = []
+    UUID = hp['UUID']
+    
+    # 2. Define the environment using gymnasium
     env = gym.make('MountainCar-v0', render_mode='human' if render else None) # show the render only when predicting
 
-    # 2. State space (Divide position and velocity into 20 segments)
-    pos_space = np.linspace(env.observation_space.low[0], env.observation_space.high[0], 20) # between -1.2 and 0.6
-    vel_space = np.linspace(env.observation_space.low[1], env.observation_space.high[1], 20) # between -0.07 and 0.07
+    # 3. State space (Divide position and velocity into segments)
+    pos_space = np.linspace(env.observation_space.low[0], env.observation_space.high[0], hp['pos_space_seg']) # between -1.2 and 0.6
+    vel_space = np.linspace(env.observation_space.low[1], env.observation_space.high[1], hp['vel_space_seg']) # between -0.07 and 0.07
 
-    # 3. Initialise the q-table
+    # 4. Initialise the q-table
     if(is_training):
         # init a 20x20x3 array, representing three possible actions
         q = np.zeros((len(pos_space), len(vel_space), env.action_space.n))
     else:
         # load from the model file
-        f = open('mountain_car_discrete.pkl', 'rb')
+        file_name = 'model/mountain_car_discrete_' + UUID + '.pkl'
+        f = open(file_name, 'rb')
+        # f = open('model/mountain_car_discrete.pkl', 'rb')
         q = pickle.load(f)
         f.close()
 
-    # 4. Initialise other hyperparameters
-    learning_rate_a = 0.9 # alpha or learning rate
-    discount_factor_g = 0.9 # gamma or discount factor
+    # 5. Initialise other hyperparameters
+    learning_rate_a = hp['learning_rate_a'] # alpha or learning rate
+    discount_factor_g = hp['discount_factor_g'] # gamma or discount factor
 
-    epsilon = 1 # randomly choose an action with probability epsilon
-    epsilon_decay_rate = 2 / episodes # epsilon decay rate
+    epsilon = hp['epsilon'] # randomly choose an action with probability epsilon
+    epsilon_decay_rate = hp['epsilon_decay_hp'] / episodes # epsilon decay rate
     # epsilon is very large at the start of training.
     # as training progresses, the approximation of the Q-table will get better, 
     #   gradually reducing epsilon
@@ -36,8 +48,10 @@ def run(episodes, is_training=True, render=False): # default mode: training
     rng = np.random.default_rng() # random number generator
     rewards_per_episode = np.zeros(episodes) # record reward per episode
 
-    # 5. Traverse each episode
+    # 6. Traverse each episode
     for i in range(episodes):
+        # get the start time
+        start_time = time.perf_counter()
         # (step1) starting position, starting velocity always 0
         state = env.reset()[0]
         #   example result of env.reset(): (array([-0.4914937,  0.       ], dtype=float32), {})
@@ -71,26 +85,42 @@ def run(episodes, is_training=True, render=False): # default mode: training
             state_v = new_state_v
             # update overall reward
             rewards += reward
+        
         # update epsilon
         epsilon = max(epsilon - epsilon_decay_rate, 0)
         # store rewards per episode
         rewards_per_episode[i] = rewards
-        # output the reward each 100 epoches
+        
+        # output the reward each 100 epochs
         if i % 100 == 0 and is_training:
             print(f"Current training epoch: {i}, having reward of {rewards_per_episode[i]}.")
         if not is_training:
             print(f"Current testing epoch: {i + 1}, having reward of {rewards_per_episode[i]}.")
-    
-    # 6. Close the environment
+        
+        # get the end time
+        end_time = time.perf_counter()
+        # compute the duration and append into the list
+        duration = end_time - start_time
+        durations.append(duration)
+        
+    # 7. Close the environment
     env.close()
     
-    # 7. Save Q-table to file when training
+    # 8. Save Q-table to file when training
     if is_training:
-        f = open('mountain_car_discrete.pkl','wb')
+        path_model = './model'
+        if not os.path.exists(path_model):
+            os.makedirs(path_model, exist_ok=True)
+        file_name = 'model/mountain_car_discrete_' + UUID + '.pkl'
+        f = open(file_name, 'wb')
+        # f = open('model/mountain_car_discrete.pkl','wb')
         pickle.dump(q, f) # write the pickled representation of Q-table 'q' to the open file object 'f'
         f.close()
         
-    # 8. Compute and plot the average reward for the past t rounds during training and testing (max 100 rounds)
+    # 9. Compute and plot the average reward for the past t rounds during training and testing (max 100 rounds)
+    path_result = './result'
+    if not os.path.exists(path_result):
+        os.makedirs(path_result, exist_ok=True)
     mean_rewards = np.zeros(episodes)
     for t in range(episodes):
         mean_rewards[t] = np.mean(rewards_per_episode[max(0, t - 100): (t + 1)])
@@ -98,26 +128,98 @@ def run(episodes, is_training=True, render=False): # default mode: training
         label = 'Training mean rewards'
     else:
         label = 'Testing mean rewards'
+    plt.figure(figsize=(7, 5))
     plt.plot(mean_rewards, label=label)
-    plt.title("Average reward for the past t rounds (max 100 rounds)")
-    plt.legend(loc='lower right')
-    path = './result'
-    if not os.path.exists(path):
-        os.makedirs(path, exist_ok=True)
-    plt.savefig(f'result/mountain_car.png')
+    plt.title(f"Average reward for the past 100 epochs [version: {UUID}]")
+    if is_training:
+        plt.legend(loc='lower right')
+        file_name = 'result/mountain_car_train_reward_' + UUID + '.png'
+        plt.savefig(f'{file_name}', dpi=300)
+        # plt.savefig(f'result/mountain_car_train_reward.png', dpi=300)
+    else:
+        plt.legend(loc='upper right')
+        # file_name = 'result/mountain_car_test_reward_' + hp['UUID'] + '.png'
+        plt.savefig(f'result/mountain_car_test_reward_{UUID}.png', dpi=300)
+        # plt.savefig(f'result/mountain_car_test_reward.png', dpi=300)
     print("Successfully plot and save the average reward!")
+    
+    if is_training:
+        # 10. Plot the box chart for durations of each batch (100 epochs per batch)
+        batch_size = 100
+        duration_100_batch = [] # 2-d array
+        for i in range(int(episodes / batch_size)):
+            duration_100_batch.append(durations[(i * batch_size): ((i + 1) * batch_size)])
+        
+        plt.figure(figsize=(16, 6))
+        plt.boxplot(duration_100_batch)
+        plt.title(f"Duration for each batch (100 epochs per batch) [version: {UUID}]")
+        plt.ylabel("Consuming Time (seconds)")
+        plt.xlabel("Batch")
+        plt.tight_layout()
+        # file_name = 'result/mountain_car_duration_' + hp['UUID'] + '.png'
+        plt.savefig(f'result/mountain_car_duration_{UUID}.png', dpi=300)
+        print("Successfully plot and save the duration for training!")
+    
+        # 11. Plot the 2-d heatmap for Q-table (considering each action)
+        for i in range(3):
+            plt.figure(figsize=(12, 6))
+            q_value = q[:, :, i]
+            ax = sns.heatmap(data=q_value, annot=True, fmt=".1f", linewidth=.5, cbar=True, cmap="crest")
+            ax.set(xlabel="position state", ylabel="velocity state")
+            ax.xaxis.tick_top()
+            plt.title(f"Heatmap for Q-table (action {i}) [version: {UUID}]")
+            # file_name = 'result/mountain_car_q_' + hp['UUID'] + '.png'
+            # UUID = hp['UUID']
+            plt.savefig(f'result/mountain_car_q{i}_{UUID}.png', dpi=300)
+            print(f"Successfully plot and save the heatmap for Q-table with action {i}!")
+    
+    # 12. show charts
+    plt.show()
+    
+    return mean_rewards
+
+def runOnce(hp):
+    # 1. Train
+    print("<=  Start training  =>")
+    train_mean_rewards = run(episodes=5000, hp=hp, is_training=True, render=False)
+    print("<=  End training!  =>\n")
+    
+    # 2. Test
+    print("<=  Start testing  =>")
+    test_mean_rewards = run(episodes=10, hp=hp, is_training=False, render=True)
+    print("<=  End testing!  =>")
+    
+    return train_mean_rewards, test_mean_rewards
 
 if __name__ == '__main__':
-    # 1. Counting
-    start = time.perf_counter()
-    # 2. Train
-    print("Start training...")
-    run(episodes=5000, is_training=True, render=False)
-    print("End training!!!")
-    # 3. Test
-    print("Start testing...")
-    run(episodes=10, is_training=False, render=True)
-    print("End testing!!!")
-    # 4. Output the consuming time
-    end = time.perf_counter()
-    print(f"The process consumes {end - start} seconds.")
+    # 1. Construct hyperparameter configurations
+    HP = {
+        'UUID': 'lr', # to distinguish storage directories
+        'pos_space_seg': 20, 'vel_space_seg': 20, 'learning_rate_a': 0.9, 'discount_factor_g': 0.9, 
+        'epsilon': 1, 'epsilon_decay_hp': 2 # epsilon decay hyperparameter
+    }
+    HP2 = {
+        'UUID': 'lr2', # to distinguish storage directories
+        'pos_space_seg': 20, 'vel_space_seg': 20, 'learning_rate_a': 1.0, 'discount_factor_g': 0.9, 
+        'epsilon': 1, 'epsilon_decay_hp': 2 # epsilon decay hyperparameter
+    }
+    
+    # 2. Initialise the dictionary for conducting t-test
+    results_table = {}
+    
+    # 3. Run experiments according to different hyperparameter configurations
+    conf_list = [HP, HP2]
+    for hp in list(enumerate(conf_list)):
+        # hp[0]: index
+        # hp[1]: content of the hyperparameter configuration
+        print(f"<<<===  Start running experiment {hp[0] + 1}  ===>>>")
+        print(f"Hyperparameter Configuration [{hp[0]}]: \n{hp[1]}\n")
+        train_mean_rewards, _ = runOnce(hp[1]) # run experiment once
+        results_table[hp[0]] = train_mean_rewards
+        print(f"<<<===  End running experiment {hp[0] + 1}!  ===>>>\n\n")
+    
+    # 4. Conduct the t-test
+    results = pd.DataFrame(results_table) # convert into a DataFrame and print
+    results.to_excel("result/mountain_car_experiments.xlsx") # save as a xlsx
+    print(f"Dataframe of result: \n{results}")
+    print(f"Result of t-test: \n{ttest_ind(results[0], results[1])}") # t-test
