@@ -30,7 +30,6 @@ def run(episodes, hp, is_training=True, render=False):
         q = np.zeros((len(pos_space), len(vel_space), env.action_space.n))
         # init a 20x20x3 array, representing v-table for three possible actions        
         v = np.zeros((len(pos_space), len(vel_space), env.action_space.n))
-        # v_tmp = np.zeros((len(pos_space), len(vel_space), env.action_space.n))
     else:
         # load from the model file (Q-table)
         f = open(f"model/mountain_car_discrete_q_{UUID}.pkl", 'rb')
