@@ -29,9 +29,7 @@ def run(episodes, hp, is_training=True, render=False):
         q = np.zeros((len(pos_space), len(vel_space), env.action_space.n))
     else:
         # load from the model file
-        # file_name = 'model/mountain_car_discrete_' + UUID + '.pkl'
         f = open(f"model/mountain_car_discrete_{UUID}.pkl", 'rb')
-        # f = open('model/mountain_car_discrete.pkl', 'rb')
         q = pickle.load(f)
         f.close()
 
@@ -110,9 +108,7 @@ def run(episodes, hp, is_training=True, render=False):
         path_model = './model'
         if not os.path.exists(path_model):
             os.makedirs(path_model, exist_ok=True)
-        # file_name = 'model/mountain_car_discrete_' + UUID + '.pkl'
         f = open(f"model/mountain_car_discrete_{UUID}.pkl", 'wb')
-        # f = open('model/mountain_car_discrete.pkl','wb')
         pickle.dump(q, f) # write the pickled representation of Q-table 'q' to the open file object 'f'
         f.close()
         
