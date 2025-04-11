@@ -7,8 +7,9 @@ import time
 import pandas as pd
 from scipy.stats import ttest_ind # t-test
 import seaborn as sns
+import math
 
-def run(episodes, hp, is_training=True, render=False): 
+def run(episodes, hp, is_training=True, render=False):
     # default mode: training
     # hp: hyperparameter configuration
     
@@ -23,15 +24,22 @@ def run(episodes, hp, is_training=True, render=False):
     pos_space = np.linspace(env.observation_space.low[0], env.observation_space.high[0], hp['pos_space_seg']) # between -1.2 and 0.6
     vel_space = np.linspace(env.observation_space.low[1], env.observation_space.high[1], hp['vel_space_seg']) # between -0.07 and 0.07
 
-    # 4. Initialise the q-table
+    # 4. Initialise the q-table and v-table
     if(is_training):
-        # init a 20x20x3 array, representing three possible actions
+        # init a 20x20x3 array, representing Q-table for three possible actions
         q = np.zeros((len(pos_space), len(vel_space), env.action_space.n))
+        # init a 20x20x3 array, representing v-table for three possible actions        
+        v = np.zeros((len(pos_space), len(vel_space), env.action_space.n))
+        # v_tmp = np.zeros((len(pos_space), len(vel_space), env.action_space.n))
     else:
-        # load from the model file
-        f = open(f"model/mountain_car_discrete_{UUID}.pkl", 'rb')
+        # load from the model file (Q-table)
+        f = open(f"model/mountain_car_discrete_q_{UUID}.pkl", 'rb')
         q = pickle.load(f)
         f.close()
+        # load from the model file (v-table)
+        f2 = open(f"model/mountain_car_discrete_v_{UUID}.pkl", 'rb')
+        v = pickle.load(f2)
+        f2.close()
 
     # 5. Initialise other hyperparameters
     learning_rate_a = hp['learning_rate_a'] # alpha or learning rate
@@ -70,12 +78,19 @@ def run(episodes, hp, is_training=True, render=False):
             # (step3) get new state (position and velocity), reward and terminated
             new_state, reward, terminated, _, _ = env.step(action)
             new_state_p = np.digitize(new_state[0], pos_space) # position
-            new_state_v = np.digitize(new_state[1], vel_space) # velocity
+            new_state_v = np.digitize(new_state[1], vel_space) # velocity    
             # (step4) update the Q-table when training
             if is_training:
+                # q-table
                 q[state_p, state_v, action] = q[state_p, state_v, action] + learning_rate_a * (
                     reward + discount_factor_g * np.max(q[new_state_p, new_state_v, :]) - q[state_p, state_v, action]
                 )
+                # v-table, storing velocity for each (pos, vel) pairs (follow transition dynamics)
+                force = 0.001
+                gravity = 0.0025
+                v[new_state_p, new_state_v, action] = v[state_p, state_v, action] + (action - 1) * force - math.cos(3 * state_p) * gravity
+                # v[new_state_p, new_state_v, action] = new_state[1] # another method
+                v[new_state_p, new_state_v, action] = np.clip(v[new_state_p, new_state_v, action], -0.07, 0.07) # clip to [-0.07, 0.07]
             # update the state
             state = new_state
             state_p = new_state_p
@@ -108,10 +123,15 @@ def run(episodes, hp, is_training=True, render=False):
         path_model = './model'
         if not os.path.exists(path_model):
             os.makedirs(path_model, exist_ok=True)
-        f = open(f"model/mountain_car_discrete_{UUID}.pkl", 'wb')
-        pickle.dump(q, f) # write the pickled representation of Q-table 'q' to the open file object 'f'
+        # write the pickled representation of Q-table 'q' to the open file object 'f'
+        f = open(f"model/mountain_car_discrete_q_{UUID}.pkl", 'wb')
+        pickle.dump(q, f)
         f.close()
-        
+        # write the pickled representation of v-table 'v' to the open file object 'f2'
+        f2 = open(f"model/mountain_car_discrete_v_{UUID}.pkl", 'wb')
+        pickle.dump(v, f2)
+        f2.close()
+    
     # 9. Compute and plot the average reward for the past t rounds during training and testing (max 100 rounds)
     path_result = './result'
     if not os.path.exists(path_result):
@@ -135,6 +155,7 @@ def run(episodes, hp, is_training=True, render=False):
         plt.savefig(f'result/mountain_car_test_reward_{UUID}.png', dpi=300)
     print("Successfully plot and save the average reward!")
     
+    action_space = {0: 'Accelerate to the left', 1: 'Don\'t accelerate', 2: 'Accelerate to the right'}
     if is_training:
         # 10. Plot the box chart for durations of each batch (100 epochs per batch)
         batch_size = 100
@@ -150,20 +171,30 @@ def run(episodes, hp, is_training=True, render=False):
         plt.tight_layout()
         plt.savefig(f'result/mountain_car_duration_{UUID}.png', dpi=300)
         print("Successfully plot and save the duration for training!")
-    else:
-        # 11. Plot the 2-d heatmap for Q-table (considering each action)
-        action_space = {0: 'Accelerate to the left', 1: 'Don\'t accelerate', 2: 'Accelerate to the right'}
+        
+        # 11. Plot the 2-d heatmap for v-table (considering each action)
         for i in range(env.action_space.n):
-            plt.figure(figsize=(14, 8))
+            plt.figure(figsize=(16, 8))
+            v_value = v[:, :, i]
+            ax = sns.heatmap(data=v_value, annot=True, fmt=".3f", linewidth=.5, cbar=True, cmap="crest")
+            ax.set(xlabel="position state", ylabel="velocity state")
+            ax.xaxis.tick_top()
+            plt.title(f"Heatmap For Velocity (Action {i}-{action_space[i]}) [Version: {UUID}]")
+            plt.savefig(f'result/mountain_car_v{i}_{UUID}.png', dpi=300)
+            print(f"Successfully plot and save the heatmap for velocity with action {i} [{action_space[i]}]!")
+    else:
+        # 12. Plot the 2-d heatmap for Q-table (considering each action)
+        for i in range(env.action_space.n):
+            plt.figure(figsize=(24, 8))
             q_value = q[:, :, i]
-            ax = sns.heatmap(data=q_value, annot=True, fmt=".1f", linewidth=.5, cbar=True, cmap="crest")
+            ax = sns.heatmap(data=q_value, annot=True, fmt=".3f", linewidth=.5, cbar=True, cmap="crest")
             ax.set(xlabel="position state", ylabel="velocity state")
             ax.xaxis.tick_top()
             plt.title(f"Heatmap For Q-table (Action {i}-{action_space[i]}) [Version: {UUID}]")
             plt.savefig(f'result/mountain_car_q{i}_{UUID}.png', dpi=300)
             print(f"Successfully plot and save the heatmap for Q-table with action {i} [{action_space[i]}]!")
     
-    # 12. show charts
+    # 13. show charts
     plt.show()
     return mean_rewards
 
@@ -181,14 +212,14 @@ def runOnce(hp):
     return train_mean_rewards, test_mean_rewards
 
 if __name__ == '__main__':
-    # 1. Construct hyperparameter configurations
+    # 1. Construct two hyperparameter configurations
     HP = {
-        'UUID': 'lr', 'train_epoch': 5000, 'test_epoch': 10, 'goal_velocity': 0, # UUID: to distinguish storage directories
+        'UUID': 'lr_0.9', 'train_epoch': 5000, 'test_epoch': 10, 'goal_velocity': 0, # UUID: to distinguish storage directories
         'pos_space_seg': 20, 'vel_space_seg': 20, 'learning_rate_a': 0.9, 'discount_factor_g': 0.9, 
         'epsilon': 1, 'epsilon_decay_hp': 2 # epsilon_decay_hp: epsilon decay hyperparameter
     }
     HP2 = {
-        'UUID': 'lr2', 'train_epoch': 5000, 'test_epoch': 10, 'goal_velocity': 0, # UUID: to distinguish storage directories
+        'UUID': 'lr_0.7', 'train_epoch': 5000, 'test_epoch': 10, 'goal_velocity': 0, # UUID: to distinguish storage directories
         'pos_space_seg': 20, 'vel_space_seg': 20, 'learning_rate_a': 0.7, 'discount_factor_g': 0.9, 
         'epsilon': 1, 'epsilon_decay_hp': 2 # epsilon_decay_hp: epsilon decay hyperparameter
     }
