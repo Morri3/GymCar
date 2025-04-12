@@ -28,16 +28,17 @@ def run(episodes, hp, is_training=True, render=False):
     if(is_training):
         # init a 20x20x3 array, representing Q-table for three possible actions
         q = np.zeros((len(pos_space), len(vel_space), env.action_space.n))
-        # init a 20x20x3 array, representing v-table for three possible actions        
-        v = np.zeros((len(pos_space), len(vel_space), env.action_space.n))
+        # # init a 20x20x3 array, representing v-table for three possible actions        
+        # v = np.zeros((len(pos_space), len(vel_space), env.action_space.n))
+        history = np.zeros((episodes, hp['pos_space_seg']))
     else:
         # load from the model file (Q-table)
         f = open(f"model/mountain_car_discrete_q_{UUID}.pkl", 'rb')
         q = pickle.load(f)
         f.close()
-        # load from the model file (v-table)
-        f2 = open(f"model/mountain_car_discrete_v_{UUID}.pkl", 'rb')
-        v = pickle.load(f2)
+        # load from the model file (average velocity for each position state)
+        f2 = open(f"model/mountain_car_discrete_vel_{UUID}.pkl", 'rb')
+        history = pickle.load(f2)
         f2.close()
 
     # 5. Initialise other hyperparameters
@@ -51,7 +52,7 @@ def run(episodes, hp, is_training=True, render=False):
     
     rng = np.random.default_rng() # random number generator
     rewards_per_episode = np.zeros(episodes) # record reward per episode
-
+    
     # 6. Traverse each episode
     for i in range(episodes):
         # get the start time
@@ -63,8 +64,11 @@ def run(episodes, hp, is_training=True, render=False):
         state_v = np.digitize(state[1], vel_space) # velocity
         # true when reached goal
         terminated = False
-        # initialise the rewards list
-        rewards = 0
+        # initialise
+        rewards = 0 # rewards list
+
+        sum_v = np.zeros(hp['pos_space_seg']) # sum of overall velocity for current episode
+        cnt_v = np.zeros_like(sum_v) # number of times the velocity exists at each position state for current episode
         
         while (not terminated and rewards > -1000):
             # (step2) choose an action using the epsilon-greedy strategy
@@ -84,18 +88,20 @@ def run(episodes, hp, is_training=True, render=False):
                 q[state_p, state_v, action] = q[state_p, state_v, action] + learning_rate_a * (
                     reward + discount_factor_g * np.max(q[new_state_p, new_state_v, :]) - q[state_p, state_v, action]
                 )
-                # v-table, storing velocity for each (pos, vel) pairs (follow transition dynamics)
-                force = 0.001
-                gravity = 0.0025
-                v[new_state_p, new_state_v, action] = v[state_p, state_v, action] + (action - 1) * force - math.cos(3 * state_p) * gravity
-                # v[new_state_p, new_state_v, action] = new_state[1] # another method
-                v[new_state_p, new_state_v, action] = np.clip(v[new_state_p, new_state_v, action], -0.07, 0.07) # clip to [-0.07, 0.07]
+                # compute overall velocities for each position state and count number of occurence of velocity
+                cnt_v[new_state_p] += 1
+                sum_v[new_state_p] += vel_space[new_state_v]
             # update the state
             state = new_state
             state_p = new_state_p
             state_v = new_state_v
             # update overall reward
             rewards += reward
+        
+        # compute the average velocity for each position state
+        for idx in range(len(sum_v)):
+            if cnt_v[idx] != 0:
+                history[i, idx] = sum_v[idx] / cnt_v[idx]
         
         # update epsilon
         epsilon = max(epsilon - epsilon_decay_rate, 0)
@@ -116,7 +122,7 @@ def run(episodes, hp, is_training=True, render=False):
         
     # 7. Close the environment
     env.close()
-    
+
     # 8. Save Q-table to file when training
     if is_training:
         path_model = './model'
@@ -127,8 +133,8 @@ def run(episodes, hp, is_training=True, render=False):
         pickle.dump(q, f)
         f.close()
         # write the pickled representation of v-table 'v' to the open file object 'f2'
-        f2 = open(f"model/mountain_car_discrete_v_{UUID}.pkl", 'wb')
-        pickle.dump(v, f2)
+        f2 = open(f"model/mountain_car_discrete_vel_{UUID}.pkl", 'wb')
+        pickle.dump(history, f2)
         f2.close()
     
     # 9. Compute and plot the average reward for the past t rounds during training and testing (max 100 rounds)
@@ -161,7 +167,6 @@ def run(episodes, hp, is_training=True, render=False):
         duration_100_batch = [] # 2-d array
         for i in range(int(episodes / batch_size)):
             duration_100_batch.append(durations[(i * batch_size): ((i + 1) * batch_size)])
-        
         plt.figure(figsize=(16, 6))
         plt.boxplot(duration_100_batch)
         plt.title(f"Duration For Each Batch (100 Epochs Per Batch) [Version: {UUID}]")
@@ -171,16 +176,15 @@ def run(episodes, hp, is_training=True, render=False):
         plt.savefig(f'result/mountain_car_duration_{UUID}.png', dpi=300)
         print("Successfully plot and save the duration for training!")
         
-        # 11. Plot the 2-d heatmap for v-table (considering each action)
-        for i in range(env.action_space.n):
-            plt.figure(figsize=(16, 8))
-            v_value = v[:, :, i]
-            ax = sns.heatmap(data=v_value, annot=True, fmt=".3f", linewidth=.5, cbar=True, cmap="crest")
-            ax.set(xlabel="position state", ylabel="velocity state")
-            ax.xaxis.tick_top()
-            plt.title(f"Heatmap For Velocity (Action {i}-{action_space[i]}) [Version: {UUID}]")
-            plt.savefig(f'result/mountain_car_v{i}_{UUID}.png', dpi=300)
-            print(f"Successfully plot and save the heatmap for velocity with action {i} [{action_space[i]}]!")
+        # 11. Plot the line chart for visualising average velocity for specific position state
+        spc_pos_state = 8
+        plt.figure(figsize=(22, 8))
+        plt.plot(range(episodes), history[:, spc_pos_state])
+        plt.xlabel("Episode")
+        plt.ylabel("Velocity")
+        plt.title(f"Average Velocity for Position State {spc_pos_state} During The Whole Training Process")
+        plt.savefig(f'result/mountain_car_v_{UUID}.png', dpi=300)
+        print(f"Successfully plot and save the line chart for average velocity of position state {spc_pos_state}!")
     else:
         # 12. Plot the 2-d heatmap for Q-table (considering each action)
         for i in range(env.action_space.n):
