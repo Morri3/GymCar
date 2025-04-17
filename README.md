@@ -1,4 +1,4 @@
-# Reinforcement Learning To Solve Mountain Car Problem
+# Mountain Car Agent
 This is the project for the **COMP4125 Designing Intelligent Agents** in 2025.
 
 ## Main repo of our group
